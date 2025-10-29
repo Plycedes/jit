@@ -16,6 +16,8 @@ func main() {
 	}
 
 	rootCmd.AddCommand(initCmd())
+	rootCmd.AddCommand(hashObjectCmd())
+	rootCmd.AddCommand(catFileCmd())
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
@@ -31,4 +33,49 @@ func initCmd() *cobra.Command {
 			return repo.InitRepo(".")
 		},
 	}
+}
+
+func hashObjectCmd() *cobra.Command {
+	var write bool
+	cmd := &cobra.Command{
+		Use:   "hash-object [flags] <file>",
+		Short: "Compute object id (sha1) of a file. Use -w to write to object store.",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			path := args[0]
+			data, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+
+			sha, err := repo.HashObject("./.jit", data, "blob", write)
+			if err != nil {
+				return err
+			}
+			fmt.Println(sha)
+			return nil
+		},
+	}
+	cmd.Flags().BoolVarP(&write, "write", "w", false, "Write the object into the object database")
+	return cmd
+}
+
+func catFileCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "cat-file -p <sha1>",
+		Short: "Pretty-print object contents (only -p supported)",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			sha := args[0]
+			typ, content, err := repo.ReadObject("./.jit", sha)
+			if err != nil {
+				return err
+			}
+
+			fmt.Printf("type: %s\n", typ)
+			os.Stdout.Write(content)
+			return nil
+		},
+	}
+	return cmd
 }
