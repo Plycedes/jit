@@ -3,7 +3,9 @@ package repo
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 )
 
 func InitRepo(path string) error {
@@ -31,6 +33,14 @@ func InitRepo(path string) error {
 
 	if err := os.WriteFile(headPath, headContent, 0644); err != nil {
 		return fmt.Errorf("failed to create HEAD: %v", err)
+	}
+
+	// Mark the folder hidden on Windows
+	if runtime.GOOS == "windows" {
+		cmd := exec.Command("attrib", "+h", jitDir)
+		if err := cmd.Run(); err != nil {
+			fmt.Printf("warning: failed to set hiddent attribute on Windows: %v\n", err)
+		}
 	}
 
 	fmt.Println("Intialized empty Jit repository in", jitDir)
