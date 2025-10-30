@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-func AddFile(rootPath, filePath string) error {
+func Add(rootPath, targetPath string) error {
 	jitDir := filepath.Join(rootPath, ".jit")
 	indexPath := filepath.Join(jitDir, "index")
 
@@ -16,12 +16,52 @@ func AddFile(rootPath, filePath string) error {
 		return fmt.Errorf("fatal: not a jit repository")
 	}
 
+	indexEntries, _ := readIndex(indexPath)
+
+	info, err := os.Stat(targetPath)
+	if err != nil {
+		return fmt.Errorf("cannot access %s: %v", targetPath, err)
+	}
+
+	if info.IsDir() {
+		err = filepath.Walk(targetPath, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+			if info.IsDir() {
+				if info.Name() == ".jit" {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+			return addSingleFile(rootPath, path, indexEntries)
+		})
+
+		if err != nil {
+			return err
+		}
+	} else {
+		if err := addSingleFile(rootPath, targetPath, indexEntries); err != nil {
+			return err
+		}
+	}
+
+	if err := writeIndex(indexPath, indexEntries); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func addSingleFile(rootPath, filePath string, indexEntries map[string]string) error {
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return fmt.Errorf("failed to read file %s: %v", filePath, err)
 	}
 
-	sha, err := HashObject(rootPath, data, "blob", true)
+	// Creating jitDir again
+	jitDir := filepath.Join(rootPath, ".jit")
+	sha, err := HashObject(jitDir, data, "blob", true)
 	if err != nil {
 		return fmt.Errorf("failed to hash file %s: %v", filePath, err)
 	}
@@ -31,12 +71,7 @@ func AddFile(rootPath, filePath string) error {
 		return err
 	}
 
-	indexEntries, _ := readIndex(indexPath)
 	indexEntries[relPath] = sha
-	if err := writeIndex(indexPath, indexEntries); err != nil {
-		return err
-	}
-
 	fmt.Printf("added '%s'\n", relPath)
 	return nil
 }
@@ -49,6 +84,7 @@ func readIndex(indexPath string) (map[string]string, error) {
 		if os.IsNotExist(err) {
 			return index, nil
 		}
+		return nil, err
 	}
 	defer f.Close()
 
