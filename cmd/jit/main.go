@@ -18,6 +18,7 @@ func main() {
 	rootCmd.AddCommand(initCmd())
 	rootCmd.AddCommand(hashObjectCmd())
 	rootCmd.AddCommand(catFileCmd())
+	rootCmd.AddCommand(addCmd())
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
@@ -31,6 +32,17 @@ func initCmd() *cobra.Command {
 		Short: "Initialize a new, empty Jit repository",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return repo.InitRepo(".")
+		},
+	}
+}
+
+func addCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "add <file>",
+		Short: "Add file contents to the index (stage them for commit)",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return repo.Add("./.jit", args[0])
 		},
 	}
 }
